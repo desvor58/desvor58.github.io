@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>micro — a linear IR language and its compiler</title>
+<meta name="description" content="micro is a minimalistic low-level IR language: flat code, no AST, no SSA. Source text goes in, raw 32-bit x86 comes out. Written in C, embeddable as a library.">
+<meta name="color-scheme" content="dark light">
+<meta property="og:title" content="micro — a linear IR language and its compiler">
+<meta property="og:description" content="Minimalistic. Lightweight. No SSA. No AST. Just compile.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0c0e'/><text x='16' y='23' font-family='ui-monospace,monospace' font-size='21' font-weight='700' text-anchor='middle' fill='%23e0a458'>%C2%B5</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+  try { var t = localStorage.getItem('micro-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark">&micro;</span>
+      <span class="brand-name">micro</span>
+      <span class="brand-tag">dev-1.0.0</span>
+    </a>
+
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#language">Language</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#codegen">Code&nbsp;gen</a>
+      <a href="#bench">Benchmarks</a>
+      <a href="#status">Status</a>
+    </nav>
+
+    <div class="nav-actions">
+      <a class="icon-btn" href="https://github.com/desvor58/micro-lang" target="_blank" rel="noopener" aria-label="Repository on GitHub" title="GitHub">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.38-3.88-1.38-.53-1.34-1.3-1.7-1.3-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.7 5.4-5.27 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/></svg>
+      </a>
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle colour theme">
+        <svg class="i-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2.4v2.2M12 19.4v2.2M2.4 12h2.2M19.4 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></g></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1Z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<span id="top"></span>
+
+<!-- ─────────────────────────────  HERO  ───────────────────────────── -->
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-text">
+      <p class="eyebrow"><span class="dot"></span> low-level IR language &middot; x86-32 backend</p>
+      <h1>Minimalistic.<br>Lightweight.<br><span class="accent">No AST.</span><br><span class="muted-word">Just compile.</span></h1>
+      <p class="lead">
+        micro is an experiment in the shape of IR code. The program is a flat
+        list of instructions grouped into functions &mdash; spiritually referencing C.
+        Your text goes in, raw 32-bit x86 comes out, and nothing in between
+        builds a tree.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/desvor58/micro-lang" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.38-3.88-1.38-.53-1.34-1.3-1.7-1.3-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.7 5.4-5.27 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/></svg>
+          View on GitHub
+        </a>
+        <a class="btn btn-ghost" href="#start">Build it</a>
+      </div>
+      <ul class="hero-facts">
+        <li><b>0</b> AST nodes</li>
+        <li><b>191</b> unit tests</li>
+        <li><b>~12&nbsp;&micro;s</b> to compile</li>
+      </ul>
+    </div>
+
+    <div class="hero-visual">
+      <figure class="code-card">
+        <figcaption class="code-head">
+          <span class="code-file">fib.micro</span>
+          <span class="code-meta-inline">the same function you would write in C</span>
+        </figcaption>
+        <pre class="code-body"><code data-lang="micro">fun fib
+    i32 n
+    ret i32
+start
+    if &lt;= n 1 : end_rec;
+
+    set i32 f1;
+    set i32 f2;
+
+    call f1 fib - n 1;
+    call f2 fib - n 2;
+
+    ret + f1 f2;
+
+end_rec:
+    ret n;
+end</code></pre>
+        <div class="code-foot">
+          <span>18 source lines</span>
+          <span class="arrow">&rarr;</span>
+          <span>25 machine instructions</span>
+          <span class="arrow">&rarr;</span>
+          <span>123 bytes, no header</span>
+        </div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  STATS  ───────────────────────────── -->
+<section class="stats">
+  <div class="container stats-grid">
+    <div class="stat"><b>6.1k</b><span>lines of C in the project</span></div>
+    <div class="stat"><b>3.7k</b><span>of them the embeddable <code>libmicro</code></span></div>
+    <div class="stat"><b>191 / 191</b><span>unit tests passing</span></div>
+    <div class="stat"><b>32-bit</b><span>raw x86, no runtime, no linker</span></div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  PHILOSOPHY  ───────────────────────────── -->
+<section class="section" id="overview">
+  <div class="container">
+    <header class="sec-head">
+      <p class="sec-label">Philosophy</p>
+      <h2 class="sec-title">Three decisions, and everything else follows</h2>
+      <p class="sec-sub">micro is small on purpose. Every feature it has was kept because the code generator could make it cheap.</p>
+    </header>
+
+    <div class="cards">
+      <article class="card">
+        <div class="card-mark">01</div>
+        <h3>Flat</h3>
+        <p>
+          A program is a plain list of instructions, and instructions are grouped
+          into functions. No blocks, no scopes, no implicit control flow &mdash; you
+          write exactly what should happen, step by step.
+        </p>
+      </article>
+      <article class="card">
+        <div class="card-mark">02</div>
+        <h3>No AST</h3>
+        <p>
+          The parser turns your text into a list of instruction structs. Or you
+          generate that list yourself when micro is used as a library. There is no
+          tree to allocate, walk or free.
+        </p>
+      </article>
+      <article class="card">
+        <div class="card-mark">03</div>
+        <h3>Fast to compile</h3>
+        <p>
+          The goal is compile speed over execution speed. A straight pipeline with
+          an arena and no node allocations is what gets there &mdash; micro reaches a
+          callable function in about 12&nbsp;&micro;s.
+        </p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  LANGUAGE  ───────────────────────────── -->
+<section class="section section-alt" id="language">
+  <div class="container">
+    <header class="sec-head">
+      <p class="sec-label">The language</p>
+      <h2 class="sec-title">Linear code, written in prefix</h2>
+      <p class="sec-sub">
+        Expressions are prefix (Polish) form, so every operand of an operation
+        is in a known place &mdash; the shape the code generator wants.
+        Comments are wrapped in backslashes.
+      </p>
+    </header>
+
+    <div class="notation" aria-label="Notation examples">
+      <div><code>+ 5 * 3 2</code><span class="arrow">&rarr;</span><code>5 + (3 * 2)</code></div>
+      <div><code>* 5 + 3 2</code><span class="arrow">&rarr;</span><code>5 * (3 + 2)</code></div>
+      <div><code>$ p</code><span class="arrow">&rarr;</span><code>*p</code></div>
+    </div>
+
+    <div class="compare">
+      <figure class="compare-col">
+        <figcaption>C</figcaption>
+        <pre class="code-block"><code data-lang="c">int fib(int n)
+{
+    if (n &lt;= 1) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}</code></pre>
+      </figure>
+      <figure class="compare-col">
+        <figcaption>micro</figcaption>
+        <pre class="code-block"><code data-lang="micro">fun fib
+    i32 n
+    ret i32
+start
+    if &lt;= n 1 : end_rec;
+
+    set i32 f1;
+    set i32 f2;
+
+    call f1 fib - n 1;
+    call f2 fib - n 2;
+
+    ret + f1 f2;
+
+end_rec:
+    ret n;
+end</code></pre>
+      </figure>
+    </div>
+    <p class="compare-cap">
+      Same function, same branch, same two calls. What is gone is the expression tree:
+      every result is named, so the code generator can give it a machine register.
+    </p>
+
+    <div class="tabs" data-tabs>
+      <div class="tablist" role="tablist" aria-label="Language topics">
+        <button class="tab" role="tab" id="tab-fn" aria-controls="p-fn" aria-selected="true">Functions</button>
+        <button class="tab" role="tab" id="tab-reg" aria-controls="p-reg" aria-selected="false" tabindex="-1">Registers</button>
+        <button class="tab" role="tab" id="tab-flow" aria-controls="p-flow" aria-selected="false" tabindex="-1">Control flow</button>
+        <button class="tab" role="tab" id="tab-host" aria-controls="p-host" aria-selected="false" tabindex="-1">Calling the host</button>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="p-fn" aria-labelledby="tab-fn">
+        <div class="split">
+          <pre class="code-block"><code data-lang="micro">fun add
+    i32 a
+    i32 b
+    ret i32
+start
+    ret + a b;
+end
+
+fun main
+    ret i32
+start
+    set i32 sum;
+    call sum add 10 5;   \ one call, one set \
+    ret sum;
+end</code></pre>
+          <div class="notes">
+            <h4>Functions look like labels</h4>
+            <p>Arguments, an optional <code>ret</code> type, then the body between <code>start</code> and <code>end</code>.</p>
+            <h4>Calls are explicit</h4>
+            <p><code>call &lt;result register&gt; &lt;function&gt; &lt;args…&gt;</code>. Use <code>_</code> to throw the result away.</p>
+            <h4>Order is checked</h4>
+            <p>The callee has to be defined before the call, the way an assembler wants it.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="p-reg" aria-labelledby="tab-reg" hidden>
+        <div class="split">
+          <pre class="code-block"><code data-lang="micro">fun entry
+    ret i32
+start
+    set i32 a 5 {lifetime:1};
+    set i32 b a;       \ still alive here \
+    set i32 a 9;       \ the name is free again \
+    set i32 c + b a;
+    ret c;
+end</code></pre>
+          <div class="notes">
+            <h4>Virtual registers</h4>
+            <p>Eight base types: <code>i8 u8 i16 u16 i32 u32 f32 ptr</code>. A register keeps its type for life.</p>
+            <h4>Six machine registers</h4>
+            <p>A value gets a machine register while it is alive and the stack when they run out. Lifetime hints shorten the stay.</p>
+            <h4>Pointers</h4>
+            <p>Put <code>$</code> in front of the name to read or write through the address it holds.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="p-flow" aria-labelledby="tab-flow" hidden>
+        <div class="split">
+          <pre class="code-block"><code data-lang="micro">fun f
+    i32 n
+    ret i32
+start
+    if n : non_zero;     \ jumps when n != 0 \
+    if ! &lt;= n 1 : big;  \ jumps when n &gt; 1 \
+    ret 0;
+big:
+    goto tail;
+non_zero:
+    ret 2;
+tail:
+    ret 1;
+end</code></pre>
+          <div class="notes">
+            <h4>Labels and jumps</h4>
+            <p><code>name:</code> and <code>goto name;</code> are the only way to build a loop.</p>
+            <h4>Conditional jumps</h4>
+            <p><code>if &lt;expr&gt; : &lt;label&gt;</code> is a conditional <code>goto</code>. Prefix with <code>!</code> to test for false.</p>
+            <h4>No surprises</h4>
+            <p>After the jump target the code continues normally, and a missing label is a compile error.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="p-host" aria-labelledby="tab-host" hidden>
+        <div class="split">
+          <pre class="code-block"><code data-lang="micro">tramp vm_add
+    i32 a
+    i32 b
+    ret i32
+end
+
+fun call_add
+    i32 a
+    i32 b
+    ret i32
+start
+    set i32 res;
+    call res vm_add a b;
+    ret res;
+end</code></pre>
+          <div class="notes">
+            <h4>Trampolines</h4>
+            <p>Declare a function your host program implements with <code>tramp</code> instead of <code>fun</code>, and give the code generator a map from that name to a handler.</p>
+            <h4>One handler, many shapes</h4>
+            <p>The handler gets a frame with the argument words and their count, so a single trampoline can dispatch calls of different arity.</p>
+            <h4>Why it exists</h4>
+            <p>To reach an interpreted function or a VM entry point that the compiler cannot see.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  PIPELINE  ───────────────────────────── -->
+<section class="section" id="pipeline">
+  <div class="container">
+    <header class="sec-head sec-head-row">
+      <div>
+        <p class="sec-label">Architecture</p>
+        <h2 class="sec-title">One straight line, two front doors</h2>
+        <p class="sec-sub">Every stage after the instruction generator is the library. A host program can start at any of them.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Pipeline entry point">
+        <button class="seg-btn is-on" data-track="compiler" type="button">as a compiler</button>
+        <button class="seg-btn" data-track="library" type="button">as a library</button>
+      </div>
+    </header>
+
+    <div class="pipeline" id="pipe-stages"></div>
+    <p class="pipe-hint">hover or click a stage</p>
+    <div class="pipe-detail" id="pipe-detail"></div>
+    <noscript>
+      <p class="fineprint">
+        The interactive view is built with JavaScript. Without it, the pipeline is just:
+        source text &rarr; lexer &rarr; tokens &rarr; instruction generator &rarr; instruction infos &rarr;
+        IR optimizer (optional) &rarr; code generator &rarr; asm instructions &rarr; assembler &rarr; raw binary.
+        Read the <a href="https://github.com/desvor58/micro-lang/blob/dev/docs/compiler-description.md" target="_blank" rel="noopener">compiler description</a> for the full version.
+      </p>
+    </noscript>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  CODEGEN  ───────────────────────────── -->
+<section class="section section-alt" id="codegen">
+  <div class="container">
+    <header class="sec-head">
+      <p class="sec-label">Code generator</p>
+      <h2 class="sec-title">Write it in the shape it folds into one instruction</h2>
+      <p class="sec-sub">
+        Two patterns are recognised while an expression is lowered, and only
+        used when every operand already lives in a machine register. You never
+        ask for it &mdash; you just write the address the way it should be computed.
+      </p>
+    </header>
+
+    <div class="split split-rev">
+      <pre class="code-block"><code data-lang="micro">fun folds
+    ret i32
+start
+    set i32 base 16;
+    set i32 index 3;
+    set i32 addr + base * index 4;  \ one lea \
+    set i32 next + index 1;         \ one inc \
+    set i32 tail + addr 4;          \ one lea \
+    ret tail;
+end</code></pre>
+      <div class="notes">
+        <h4>The rule</h4>
+        <p>You never ask for the fold. The expression has the right shape, so the code generator finds the pattern while it lowers.</p>
+        <h4>Displacement is part of the match</h4>
+        <p>A literal added to the scaled term is folded into the instruction, and the shortest of the three encodings wins.</p>
+        <h4>Anything else still works</h4>
+        <p>A scale of 3, or an operand that already spilled to the frame, simply falls back to the plain <code>imul</code> and <code>add</code> sequence.</p>
+      </div>
+    </div>
+
+    <p class="block-cap">the same function, as printed by <code>microc -Pa</code></p>
+    <pre class="code-block code-block-wide"><code data-lang="asm">folds:
+    prelude
+    pushR32 edi
+    pushR32 esi
+    pushR32 ebx
+folds.start:
+    movR32I32 eax, 16
+    movR32I32 ecx, 3
+    leaR32SIB edx, [eax + ecx*4]     # set i32 addr
+    movR32R32 ebx, ecx
+    incR32 ebx                       # set i32 next
+    leaR32SIBI8 esi, [edx + 4]       # set i32 tail
+    movR32R32 edi, eax
+    movR32R32 eax, esi
+folds.end:
+    popR32 ebx
+    popR32 esi
+    popR32 edi
+    epilogue</code></pre>
+
+    <div class="folds">
+      <div class="fold-head"><span>expression</span><span>generated</span></div>
+      <div class="fold-row"><code>+ b * i 4</code><code>lea r, [b + i * 4]</code></div>
+      <div class="fold-row"><code>+ b * i 8</code><code>lea r, [b + i * 8]</code></div>
+      <div class="fold-row"><code>+ + b * i 4 8</code><code>lea r, [b + i * 4 + 8]</code></div>
+      <div class="fold-row"><code>+ * i 4 8</code><code>lea r, [i * 4 + 8]</code></div>
+      <div class="fold-row"><code>+ b 4</code><code>lea r, [b + 4]</code></div>
+      <div class="fold-row"><code>* i 4</code><code>lea r, [i * 4]</code></div>
+      <div class="fold-row"><code>+ i 1</code><code>inc r</code></div>
+      <div class="fold-row"><code>- i 1</code><code>dec r</code></div>
+    </div>
+
+    <p class="fineprint">
+      The full set of recognised shapes, from the language reference. Everything outside it still
+      compiles &mdash; it just does not fit in a single instruction.
+    </p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  BENCHMARKS  ───────────────────────────── -->
+<section class="section" id="bench">
+  <div class="container">
+    <header class="sec-head sec-head-row">
+      <div>
+        <p class="sec-label">Measurements</p>
+        <h2 class="sec-title">Where the time actually goes</h2>
+        <p class="sec-sub">Fibonacci, GCD, checksum, bubble sort and matrix multiply, compiled through the public API of each backend. Median over the workloads.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Benchmark metric" id="bench-seg">
+        <button class="seg-btn is-on" data-metric="compile" type="button">compile</button>
+        <button class="seg-btn" data-metric="ready" type="button">ready</button>
+        <button class="seg-btn" data-metric="steady" type="button">steady call</button>
+      </div>
+    </header>
+
+    <div class="bench" id="bench-chart"></div>
+    <p class="bench-note" id="bench-note"></p>
+    <noscript>
+      <p class="fineprint">
+        Compilation to finished machine code, median over the workloads:
+        <strong>micro 11.7&nbsp;&micro;s</strong>, MIR at optimisation level 2 255.4&nbsp;&micro;s,
+        LLVM MCJIT 795.7&nbsp;&micro;s. Until a callable function exists: 21.0, 246.1 and 698.8&nbsp;&micro;s.
+        Raw samples are in <code>comp/results.json</code>.
+      </p>
+    </noscript>
+
+    <p class="fineprint">
+      micro emits x86-32; the local LLVM and MIR helpers run on x86-64 with their native ABIs,
+      and MIR has no i386 backend in this checkout. These ratios are honest about compile speed and
+      explicitly <em>not</em> an ISA-independent code-quality claim. Use <code>comp/benchmark_i386.py</code>
+      for the like-for-like native run.
+    </p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  STATUS  ───────────────────────────── -->
+<section class="section section-alt" id="status">
+  <div class="container">
+    <header class="sec-head">
+      <p class="sec-label">Status</p>
+      <h2 class="sec-title">An unstable MVP, honestly labelled</h2>
+      <p class="sec-sub">The whole pipeline works and is tested. The language and the code generator are still moving.</p>
+    </header>
+
+    <div class="status-grid">
+      <div class="status-col">
+        <h3 class="status-h done"><span class="tick"></span>Working</h3>
+        <ul class="status-list">
+          <li>Lexer</li>
+          <li>Instruction builder</li>
+          <li>i386 code generator with <code>lea</code> code selection</li>
+          <li>Assembly peephole optimizer</li>
+          <li>IR optimizer: inlining of small calls, <code>-Oi</code></li>
+          <li>191 unit tests over lexer, instructions and backend</li>
+          <li>Library API &mdash; the compiler itself is built on it</li>
+          <li>Trampolines, in source and through an API map</li>
+          <li>Embed as a library, compile at runtime, map the bytes, call it</li>
+        </ul>
+      </div>
+      <div class="status-col">
+        <h3 class="status-h todo"><span class="dash"></span>Not there yet</h3>
+        <ul class="status-list">
+          <li>Object file output &mdash; the result is a raw binary</li>
+          <li>Backends other than i386</li>
+          <li><code>f32</code> arithmetic</li>
+          <li>Bitwise operators</li>
+          <li>Dead code removal after inlining</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  GET STARTED  ───────────────────────────── -->
+<section class="section" id="start">
+  <div class="container">
+    <header class="sec-head">
+      <p class="sec-label">Get started</p>
+      <h2 class="sec-title">Clone, make, compile</h2>
+      <p class="sec-sub">A plain Makefile, gcc or clang, and a 32-bit toolchain. Nothing else to install.</p>
+    </header>
+
+    <div class="start-grid">
+      <div class="term" data-copy-group>
+        <div class="term-head"><span class="term-title">build &amp; test</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre class="code-block"><code data-lang="bash">git clone https://github.com/desvor58/micro-lang
+cd micro-lang
+make            # build microc
+make test       # 191 tests, debug and release-fast
+make MODE=debug # the slow, readable build
+make examples   # compile, mmap and call real code</code></pre>
+      </div>
+
+      <div class="term" data-copy-group>
+        <div class="term-head"><span class="term-title">use microc</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre class="code-block"><code data-lang="bash">microc [flags] &lt;input file&gt;
+
+-P t|i|a   print tokens / instructions / asm
+-S r|l|i|a stop after a stage
+-N a       skip a stage
+-O i       run the inlining pass
+-o &lt;file&gt;   output name, a.out by default
+
+./bin/microc -Oi -Pa -o fib.bin fib.micro</code></pre>
+      </div>
+    </div>
+
+    <div class="docs-row">
+      <a class="doc-card" href="https://github.com/desvor58/micro-lang/blob/dev/docs/micro-language-ref.md" target="_blank" rel="noopener">
+        <h4>Language reference</h4>
+        <p>Types, operators, lifetime hints, functions, trampolines, code selection.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/desvor58/micro-lang/blob/dev/docs/compiler-description.md" target="_blank" rel="noopener">
+        <h4>Compiler description</h4>
+        <p>Every stage, the IR optimizer, the peephole rules, the library API.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/desvor58/micro-lang/blob/dev/docs/good-micro-code-style.md" target="_blank" rel="noopener">
+        <h4>Code style</h4>
+        <p>Naming, function layout, and how to write an expression that folds.</p>
+      </a>
+      <a class="doc-card" href="https://github.com/desvor58/micro-lang/tree/dev/comp" target="_blank" rel="noopener">
+        <h4>Benchmarks</h4>
+        <p>The micro, LLVM IR and MIR workloads, and everything about fairness.</p>
+      </a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div>
+      <span class="brand-mark">&micro;</span>
+      <p>Minimalistic. Lightweight. No SSA. No AST. Just compile.</p>
+    </div>
+    <div class="footer-meta">
+      <p>MIT licensed &middot; &copy; 2026 Desvor</p>
+      <p><a href="https://github.com/desvor58/micro-lang" target="_blank" rel="noopener">github.com/desvor58/micro-lang</a></p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
